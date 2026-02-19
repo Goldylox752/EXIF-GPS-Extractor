@@ -1,14 +1,72 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Metadata Extractor</title>
+    <meta charset="UTF-8">
+    <title>JS Metadata Extractor</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
+        #output { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+    </style>
 </head>
 <body>
-    <h1>Upload a Photo to Extract Metadata</h1>
+    <h1>📸 Image Metadata Extractor</h1>
+    <p>Upload a JPEG to see the binary "Make" and "Model" data.</p>
+    
     <input type="file" id="upload" accept="image/jpeg">
-    <pre id="output">Results will appear here...</pre>
+    <hr>
+    <h3>Results:</h3>
+    <pre id="output">Waiting for file...</pre>
 
-    <!-- Link your JS file here -->
-    <script src="src/image.js"></script>
+    <script>
+      // Helper: Convert binary bytes to a readable string
+      const getString = (view, offset, length) => {
+        let str = "";
+        for (let i = 0; i < length; i++) {
+          str += String.fromCharCode(view.getUint8(offset + i));
+        }
+        return str.replace(/\0/g, '').trim(); // Clean up null characters
+      };
+
+      document.getElementById('upload').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        const output = document.getElementById('output');
+        
+        // 1. Verify JPEG Header (0xFFD8)
+        if (view.getUint16(0) !== 0xFFD8) {
+          output.innerText = "Error: Not a valid JPEG file.";
+          return;
+        }
+
+        output.innerText = "Processing " + file.name + "...\n";
+
+        // 2. Scan for EXIF Marker (0xFFE1)
+        let offset = 2;
+        let found = false;
+
+        while (offset < view.byteLength) {
+          if (view.getUint16(offset) === 0xFFE1) {
+            // Found it! Skip marker and length to reach "Exif\0\0"
+            const exifHeader = getString(view, offset + 4, 4);
+            if (exifHeader === "Exif") {
+              output.innerText += "✅ EXIF Block Found!\n";
+              
+              // Simple "Make" extraction demo (roughly at offset + 20-40 depending on file)
+              // Real parsing requires a loop through IFD tags, but let's show the raw data:
+              const rawData = getString(view, offset + 12, 100);
+              output.innerText += "Raw Header Snippet: " + rawData;
+              found = true;
+              break;
+            }
+          }
+          offset += 2 + view.getUint16(offset + 2);
+        }
+
+        if (!found) output.innerText += "❌ No EXIF metadata found.";
+      };
+    </script>
 </body>
 </html>
