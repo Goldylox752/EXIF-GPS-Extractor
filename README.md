@@ -1,4 +1,4 @@
-# 📸 Metadata Extractor JS
+# 📸 Metadata Extractor 
 
 A lightweight, zero-dependency JavaScript utility for extracting EXIF metadata from images and SEO tags from web pages.
 
