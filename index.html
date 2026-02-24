@@ -1,72 +1,46 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>JS Metadata Extractor</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; line-height: 1.6; }
-        #output { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
-    </style>
-</head>
-<body>
-    <h1>📸 Image Metadata Extractor</h1>
-    <p>Upload a JPEG to see the binary "Make" and "Model" data.</p>
-    
-    <input type="file" id="upload" accept="image/jpeg">
-    <hr>
-    <h3>Results:</h3>
-    <pre id="output">Waiting for file...</pre>
+// Helper: Convert EXIF Rational (two 32-bit ints) to a float
+const getRational = (view, offset, endian) => {
+    const num = view.getUint32(offset, endian);
+    const den = view.getUint32(offset + 4, endian);
+    return num / den;
+};
 
-    <script>
-      // Helper: Convert binary bytes to a readable string
-      const getString = (view, offset, length) => {
-        let str = "";
-        for (let i = 0; i < length; i++) {
-          str += String.fromCharCode(view.getUint8(offset + i));
+// Main parsing logic inside your loop
+// ... (inside the IFD loop from the previous step)
+
+if (tag === 0x8825) { // 0x8825 is the pointer to the GPS IFD
+    const gpsIFDOffset = view.getUint32(entryOffset + 8, littleEndian);
+    const gpsStart = tiffStart + gpsIFDOffset;
+    const gpsEntries = view.getUint16(gpsStart, littleEndian);
+
+    let lat, latRef, lon, lonRef;
+
+    for (let j = 0; j < gpsEntries; j++) {
+        const subEntryOffset = gpsStart + 2 + (j * 12);
+        const subTag = view.getUint16(subEntryOffset, littleEndian);
+        const valOffset = view.getUint32(subEntryOffset + 8, littleEndian);
+        const absoluteOffset = tiffStart + valOffset;
+
+        if (subTag === 1) latRef = getString(view, subEntryOffset + 8, 1); // 'N' or 'S'
+        if (subTag === 2) { // Latitude (Degrees, Minutes, Seconds)
+            const d = getRational(view, absoluteOffset, littleEndian);
+            const m = getRational(view, absoluteOffset + 8, littleEndian);
+            const s = getRational(view, absoluteOffset + 16, littleEndian);
+            lat = d + (m / 60) + (s / 3600);
         }
-        return str.replace(/\0/g, '').trim(); // Clean up null characters
-      };
-
-      document.getElementById('upload').onchange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const buffer = await file.arrayBuffer();
-        const view = new DataView(buffer);
-        const output = document.getElementById('output');
-        
-        // 1. Verify JPEG Header (0xFFD8)
-        if (view.getUint16(0) !== 0xFFD8) {
-          output.innerText = "Error: Not a valid JPEG file.";
-          return;
+        if (subTag === 3) lonRef = getString(view, subEntryOffset + 8, 1); // 'E' or 'W'
+        if (subTag === 4) { // Longitude
+            const d = getRational(view, absoluteOffset, littleEndian);
+            const m = getRational(view, absoluteOffset + 8, littleEndian);
+            const s = getRational(view, absoluteOffset + 16, littleEndian);
+            lon = d + (m / 60) + (s / 3600);
         }
+    }
 
-        output.innerText = "Processing " + file.name + "...\n";
-
-        // 2. Scan for EXIF Marker (0xFFE1)
-        let offset = 2;
-        let found = false;
-
-        while (offset < view.byteLength) {
-          if (view.getUint16(offset) === 0xFFE1) {
-            // Found it! Skip marker and length to reach "Exif\0\0"
-            const exifHeader = getString(view, offset + 4, 4);
-            if (exifHeader === "Exif") {
-              output.innerText += "✅ EXIF Block Found!\n";
-              
-              // Simple "Make" extraction demo (roughly at offset + 20-40 depending on file)
-              // Real parsing requires a loop through IFD tags, but let's show the raw data:
-              const rawData = getString(view, offset + 12, 100);
-              output.innerText += "Raw Header Snippet: " + rawData;
-              found = true;
-              break;
-            }
-          }
-          offset += 2 + view.getUint16(offset + 2);
-        }
-
-        if (!found) output.innerText += "❌ No EXIF metadata found.";
-      };
-    </script>
-</body>
-</html>
+    if (lat && lon) {
+        const finalLat = latRef === 'S' ? -lat : lat;
+        const finalLon = lonRef === 'W' ? -lon : lon;
+        output.innerText += `📍 Location: ${finalLat.toFixed(6)}, ${finalLon.toFixed(6)}\n`;
+        output.innerText += `🔗 Google Maps: https://www.google.com/maps?q=${finalLat},${finalLon}\n`;
+    }
+}
