@@ -1,14 +1,4 @@
-// Helper: Convert EXIF Rational (two 32-bit ints) to a float
-const getRational = (view, offset, endian) => {
-    const num = view.getUint32(offset, endian);
-    const den = view.getUint32(offset + 4, endian);
-    return num / den;
-};
-
-// Main parsing logic inside your loop
-// ... (inside the IFD loop from the previous step)
-
-if (tag === 0x8825) { // 0x8825 is the pointer to the GPS IFD
+if (tag === 0x8825) { // GPS IFD pointer
     const gpsIFDOffset = view.getUint32(entryOffset + 8, littleEndian);
     const gpsStart = tiffStart + gpsIFDOffset;
     const gpsEntries = view.getUint16(gpsStart, littleEndian);
@@ -21,19 +11,19 @@ if (tag === 0x8825) { // 0x8825 is the pointer to the GPS IFD
         const valOffset = view.getUint32(subEntryOffset + 8, littleEndian);
         const absoluteOffset = tiffStart + valOffset;
 
-        if (subTag === 1) latRef = getString(view, subEntryOffset + 8, 1); // 'N' or 'S'
-        if (subTag === 2) { // Latitude (Degrees, Minutes, Seconds)
+        if (subTag === 1) latRef = getString(view, absoluteOffset, 2).replace(/\0/, '');
+        if (subTag === 2) {
             const d = getRational(view, absoluteOffset, littleEndian);
             const m = getRational(view, absoluteOffset + 8, littleEndian);
             const s = getRational(view, absoluteOffset + 16, littleEndian);
-            lat = d + (m / 60) + (s / 3600);
+            lat = d + m / 60 + s / 3600;
         }
-        if (subTag === 3) lonRef = getString(view, subEntryOffset + 8, 1); // 'E' or 'W'
-        if (subTag === 4) { // Longitude
+        if (subTag === 3) lonRef = getString(view, absoluteOffset, 2).replace(/\0/, '');
+        if (subTag === 4) {
             const d = getRational(view, absoluteOffset, littleEndian);
             const m = getRational(view, absoluteOffset + 8, littleEndian);
             const s = getRational(view, absoluteOffset + 16, littleEndian);
-            lon = d + (m / 60) + (s / 3600);
+            lon = d + m / 60 + s / 3600;
         }
     }
 
