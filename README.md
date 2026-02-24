@@ -7,3 +7,6 @@ Installation
 git clone https://github.com/<Goldylox752>/exif-gps-extractor.git
 cd exif-gps-extractor
 npm install
+
+License
+MIT License © Goldylox752
