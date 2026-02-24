@@ -1,10 +1,3 @@
-# 📸 Metadata Extractor 
+EXIF GPS Extractor
 
-A lightweight, zero-dependency JavaScript utility for extracting EXIF metadata from images and SEO tags from web pages.
-
-## 🚀 Quick Start
-
-### For Web Scraping (Node.js)
-First, ensure you have the dependencies installed:
-```bash
-npm install axios cheerio
+A lightweight JavaScript tool to extract GPS coordinates from JPEG images’ EXIF metadata and generate direct Google Maps links. Perfect for photographers, developers, or anyone needing to quickly retrieve location data from photos.
